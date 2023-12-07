@@ -1,0 +1,15 @@
+# Modifications to enable coumpound bookings
+
+We provide one implementation where compound-bookings are handled one by one where conflicts in compounds (e. g. room & room)
+not allowed, so that all parts of the compound can be tackled concurrently and one where also conflicts in compounds are allowed
+and the compound is worked through consecutively (reservations.legacy).
+
+In both cases in the all parts of the compound are checked and the appropriate
+actions collected along the way. These actions are only excecuted if all of them are possible.
+The VIP system is still in place and overwrites of non-VIPs and the corresponding notifications
+are only done, if the whole compound the VIP wants to book is bookable.
+
+Compounds are the default and single bookings are done as compounds with only one booking.
+
+When the non-VIP user is overwritten by a VIP in a booking of a compound, the rest of the compound
+is also deleted (implementation: each booking contains a reference to its compound).

@@ -1,0 +1,213 @@
+///////////////////////////////////////////////////////////////////////
+//////////////// Simple Reservations System (Task 1) //////////////////
+///////////////////////////////////////////////////////////////////////
+
+// Summary: This program implements a simple reservations system.
+//          There are facilities (e.g. rooms or projectors) which
+//          can be booked by users. The facilities have a capacity
+//          and can only be booked if the capacity is not exceeded.
+
+// In this simple setting users can be just goroutines
+// for more improvements and better messages see task 2
+// and task 3.
+
+///////////////////////////////////////////////////////////////////////
+
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+//////////////////// Definition of useful Structs ////////////////////
+
+// struct for user with id (add in 2., not needed in 1.)
+// type User struct {
+// 	Id int
+// }
+
+// struct for booking with user and timeslot
+type Booking struct {
+	UserID    int
+	StartTime int
+	EndTime   int
+}
+
+// struct for facilities with id, bookings and capacity
+type Facility struct {
+	Id       string // like "room" or "projector"
+	Bookings []Booking
+	Capacity int
+}
+
+// struct for all facilities
+type Facilities struct {
+	Facilities []Facility
+}
+
+// time struct
+type ProgramTime struct {
+	time int
+}
+
+// //////////////////// Time functionality //////////////////////
+// get program time
+func (pt *ProgramTime) GetCurrentTime() int {
+	return pt.time
+}
+
+// start program time
+func StartProgramTime() *ProgramTime {
+	// receives current time
+	ticker := time.NewTicker(time.Second)
+
+	// store program time
+	var programTime ProgramTime
+
+	// increment program time
+	go func() {
+		for range ticker.C {
+			programTime.time++
+		}
+	}()
+
+	return &programTime
+}
+
+// request struct
+type Request struct {
+	FacilityId string
+	UserID     int
+	StartTime  int
+	EndTime    int
+}
+
+//////////////////////// Server ////////////////////////
+
+// server with input channel taking a booking and output
+// channel returning a bool (true if booking was successful)
+// it also gets the current time and the facilities
+
+func Server(input chan Request, output chan bool, programTime *ProgramTime, facilities *Facilities) {
+	// infinite loop
+	for {
+		// receive booking
+
+		request := <-input
+
+		// check if booking is possible
+		possible := CheckBooking(request, programTime, facilities)
+
+		// send result
+		output <- possible
+	}
+}
+
+// //////////////////// Check Booking //////////////////////
+
+// go through all facilities, check if in the selected timeslot
+// there are less than the capacity of the facility booked
+func CheckBooking(request Request, programTime *ProgramTime, facilities *Facilities) bool {
+	// check if the booking is in the future
+	if request.StartTime < programTime.GetCurrentTime() {
+		return false
+	}
+	// check if start time is before end time
+	if request.StartTime >= request.EndTime {
+		return false
+	}
+	// check all facilities
+	for i := 0; i < len(facilities.Facilities); i++ {
+		facility := &facilities.Facilities[i]
+		// check if the booking is for this facility
+		if request.FacilityId == facility.Id {
+			// go through all bookings of this facility
+			num_reserved := 0
+			for _, booking := range facility.Bookings {
+				// check if request start time or end time is in the
+				// interval of the booking
+				if (request.StartTime >= booking.StartTime && request.StartTime < booking.EndTime) ||
+					(request.EndTime > booking.StartTime && request.EndTime <= booking.EndTime) {
+					num_reserved++
+				}
+				// check if num_reserved matches capacity
+				if num_reserved >= facility.Capacity {
+					return false
+				}
+			}
+			// make booking
+			facility.Bookings = append(facility.Bookings, Booking{UserID: request.UserID, StartTime: request.StartTime, EndTime: request.EndTime})
+
+			return true
+		}
+	}
+	return false
+}
+
+// //////////////////// Simple Booker //////////////////////
+
+func SimpleBooker(wg *sync.WaitGroup, input chan Request, output chan bool, facilityID string, userID int, startTime int, endTime int) bool {
+	input <- Request{FacilityId: facilityID, UserID: userID, StartTime: startTime, EndTime: endTime}
+	out := <-output
+	if out {
+		// String in the form: User X booked facility Y from time Z to time W
+		fmt.Println("User", userID, "booked facility", facilityID, "from time", startTime, "to time", endTime)
+	} else {
+		fmt.Println("User", userID, "could not book facility", facilityID, "from time", startTime, "to time", endTime)
+	}
+	wg.Done()
+	return out
+}
+
+// //////////////////// Main //////////////////////
+
+func main() {
+	// start program time
+	programTime := StartProgramTime()
+	fmt.Println("=========== Program started ===========")
+	// create facilities
+	rooms := Facility{Id: "room", Capacity: 2}
+	projectors := Facility{Id: "projector", Capacity: 2}
+	// create facilities struct
+	facilities := Facilities{Facilities: []Facility{rooms, projectors}}
+	// create channels
+	input := make(chan Request)
+	output := make(chan bool)
+
+	// start server
+	go Server(input, output, programTime, &facilities)
+
+	// init wait group
+	var wg sync.WaitGroup
+	wg.Add(7)
+
+	////////////////////// Tests //////////////////////
+	// check time test
+	go SimpleBooker(&wg, input, output, "room", 1, -10, 0)
+	// check start time before end time test
+	go SimpleBooker(&wg, input, output, "room", 11, 15, 10)
+	// check bookinks
+	go SimpleBooker(&wg, input, output, "room", 2, 10, 15)
+
+	go SimpleBooker(&wg, input, output, "room", 3, 11, 15)
+
+	go SimpleBooker(&wg, input, output, "room", 4, 12, 15)
+
+	go SimpleBooker(&wg, input, output, "room", 5, 15, 25)
+
+	go SimpleBooker(&wg, input, output, "room", 6, 25, 30)
+
+	// wait for all goroutines to finish
+	wg.Wait()
+
+}
+
+////////////////////// TODO //////////////////////
+
+// TODO:  - add better error messages
+//        - add full-fledged users
+//        - add tests
+//        - remove old bookings
+//        - make future proof using BookingMessage struct

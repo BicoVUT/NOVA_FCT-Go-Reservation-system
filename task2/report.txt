@@ -1,0 +1,10 @@
+# Priority system
+
+Again for a given request from some user to some facility, the overlaps to existing timeframes are counted
+and compared to the number of instances of the resource. In addition, now
+the number of VIP requests is counted separately. If a VIP request comes in
+and there is an overlap with a non-VIP booking, the non-VIP booking is
+cancelled, the respective user notified and the VIP request is processed.
+VIPs cannot cancel each other.
+
+Different facilities can be booked concurrently.

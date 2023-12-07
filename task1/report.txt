@@ -1,0 +1,18 @@
+# General System Design - Messaging Style Design
+Our system is designed in a way where the each ressource has an inbox inbox from which
+user requests (user X whats to book Y from A to B), that can be send out concurrently, 
+are processed one by one, each user also has an inbox to which responses are send.
+
+An advantage of specific message channels per ressource and user is that compared to some
+broadcast system "overall network traffixc (think of a distributed system) is reduced.
+
+# How are double-bookings prevented?
+For each booking request, the server counts the overlaps of the requested timespan
+with the existing bookings. If this exceeds the total number of available instances
+of the requested recourse, the request is rejected.
+
+# Note on clock and end of the system
+In a normal server setting, the server would just be running and the clients would
+send request whenever they feel comfortable. Building in automatic ending with waitgroups
+therefore does not make too much sense. We therefore decided just to let the
+server running and just terminate is after end-of-lifetime.
